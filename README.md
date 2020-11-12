@@ -1,7 +1,7 @@
 ## CSCI 567 (Machine Learning) Fall 2020, USC
 
 #### Description
-Application of machine learning algorithms in coding tasks assigned during course. Captures : knn, regression, linear classifier, neural networks, hmm, kmeans.
+Application of machine learning algorithms in coding tasks assigned during course. Captures : KNN, Regression, Linear Classifier, Neural Networks, HMM, K-Means.
 
 #### Homworks
 
