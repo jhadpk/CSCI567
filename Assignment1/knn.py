@@ -44,11 +44,12 @@ class KNN:
         """
         nearest_neighbours = []
         for i in range(len(self.features)):
-            nearest_neighbours.append((self.labels[i], self.distance_function(point, self.features[i])))
-            nearest_neighbours.sort(key=lambda y: y[1])
+            distance = self.distance_function(point, self.features[i])
+            nearest_neighbours.append((distance, self.labels[i]))
+        nearest_neighbours.sort(key=lambda y: y[0])
         k_nearest_neighbour_labels = []
         for i in range(self.k):
-            k_nearest_neighbour_labels.append(nearest_neighbours[i][0])
+            k_nearest_neighbour_labels.append(nearest_neighbours[i][1])
         return k_nearest_neighbour_labels
 
     # TODO: predict labels of a list of points
@@ -65,7 +66,8 @@ class KNN:
         predicted_labels = []
         for point in features:
             k_nearest_labels = self.get_k_neighbors(point)
-            most_common, num_most_common = Counter(k_nearest_labels).most_common(1)[0]
+            keys = Counter(k_nearest_labels)
+            most_common, count = keys.most_common(1)[0]
             predicted_labels.append(most_common)
         return predicted_labels
 

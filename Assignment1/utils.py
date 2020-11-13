@@ -41,7 +41,7 @@ class Distances:
         """
         cubed_sum = 0
         for x, y in zip(point1, point2):
-            cubed_sum = cubed_sum + (x - y) ** 3
+            cubed_sum = cubed_sum + np.absolute(x - y) ** 3
         return float(np.cbrt(cubed_sum))
 
     @staticmethod
@@ -72,13 +72,13 @@ class Distances:
             norm_point1 = norm_point1 + x ** 2
             norm_point2 = norm_point2 + y ** 2
             product_sum = product_sum + x * y
+        if norm_point1 == 0 or norm_point2 == 0:
+            return 1
         return float(1 - float(product_sum) / float(np.sqrt(norm_point1) * np.sqrt(norm_point2)))
 
 
 class HyperparameterTuner:
     def __init__(self):
-        self.dist_funcs_priority = ['euclidean', 'minkowski', 'cosine_dist']
-        self.scaling_classes_priority = ['min_max_scale', 'normalize']
         self.best_k = None
         self.best_distance_function = None
         self.best_scaler = None
@@ -103,7 +103,6 @@ class HyperparameterTuner:
         (this will also be the insertion order in "distance_funcs", to make things easier).
         For the same distance function, further break tie by prioritizing a smaller k.
         """
-
         # You need to assign the final values to these variables
         self.best_k = None
         self.best_distance_function = None
@@ -120,17 +119,6 @@ class HyperparameterTuner:
                     self.best_distance_function = distance_func
                     self.best_model = model
                     best_f1_score = calculated_f1_score
-                # if self.best_k is None:
-                #     self.best_k = k
-                #     self.best_distance_function = distance_func
-                #     self.best_model = model
-                #     best_f1 = calculated_f1_score
-                # elif calculated_f1_score > best_f1:
-                #     self.best_k = k
-                #     self.best_distance_function = distance_func
-                #     self.best_model = model
-                #     best_f1 = calculated_f1_score
-        return
 
     # TODO: find parameters with the best f1 score on validation dataset, with normalized data
     def tuning_with_scaling(self, distance_funcs, scaling_classes, x_train, y_train, x_val, y_val):
@@ -144,29 +132,23 @@ class HyperparameterTuner:
         :param y_val: List[int] validation labels
 
         Find the best k, distance_function (its name), scaler (its name), and model (an instance of KNN), and assign them to self.best_k, self.best_distance_function, best_scaler, and self.best_model respectively.
-        
+
         NOTE: When there is a tie, choose the model based on the following priorities:
         First check scaler, prioritizing "min_max_scale" over "normalize" (which will also be the insertion order of scaling_classes). Then follow the same rule as in "tuning_without_scaling".
         """
-
         # You need to assign the final values to these variables
         self.best_k = None
         self.best_distance_function = None
         self.best_scaler = None
         self.best_model = None
         best_f1_score = 0
-
         for scaling_class in scaling_classes:
             scalar = scaling_classes[scaling_class]()
-        # for scaling_class in self.scaling_classes_priority:
-        #     scalar = scaling_classes[scaling_class]()
             scaled_x_train = scalar.__call__(x_train)
             scaled_x_val = scalar.__call__(x_val)
             for distance_func in distance_funcs:
-            # for selected_distance_func in self.dist_funcs_priority:
                 for k in range(1, min(31, len(x_train) + 1), 2):
                     model = KNN(k, distance_funcs[distance_func])
-                    # model = KNN(k, distance_funcs[selected_distance_func])
                     model.train(scaled_x_train, y_train)
                     y_val_pred = model.predict(scaled_x_val)
                     calculated_f1_score = f1_score(y_val, y_val_pred)
@@ -176,18 +158,6 @@ class HyperparameterTuner:
                         self.best_scaler = scaling_class
                         self.best_model = model
                         best_f1_score = calculated_f1_score
-                    # if self.best_k is None:
-                    #     self.best_k = k
-                    #     self.best_distance_function = distance_func
-                    #     self.best_scaler = scaling_class
-                    #     self.best_model = model
-                    #     best_f1 = calculated_f1_score
-                    # elif calculated_f1_score > best_f1:
-                    #     self.best_k = k
-                    #     self.best_distance_function = distance_func
-                    #     self.best_scaler = scaling_class
-                    #     self.best_model = model
-                    #     best_f1 = calculated_f1_score
 
 
 class NormalizationScaler:
@@ -206,27 +176,25 @@ class NormalizationScaler:
         :param features: List[List[float]]
         :return: List[List[float]]
         """
-        total_features = len(features)
-        feature_length = len(features[0])
-        normalized_features = [[0] * feature_length for x in range(total_features)]
-        for x in range(total_features):
+        total_data = len(features)
+        total_features = len(features[0])
+        normalized_features = [[0] * total_features for x in range(total_data)]
+        for x in range(total_data):
             norm = 0
-            for y in range(feature_length):
+            for y in range(total_features):
                 norm += (features[x][y] ** 2)
             norm = np.sqrt(norm)
             if norm == 0:
                 normalized_features[x] = features[x]
                 continue
-            for y in range(feature_length):
+            for y in range(total_features):
                 normalized_features[x][y] = 0 if features[x][y] == 0 else features[x][y] / norm
         return normalized_features
 
 
 class MinMaxScaler:
     def __init__(self):
-        self.is_first_call = True
-        self.minimum_feature_list = []
-        self.maximum_feature_list = []
+        pass
 
     # TODO: min-max normalize data
     def __call__(self, features):
@@ -244,27 +212,20 @@ class MinMaxScaler:
         :param features: List[List[float]]
         :return: List[List[float]]
         """
-        total_features = len(features)
-        feature_length = len(features[0])
-        normalized_features = [[0] * feature_length for _ in range(total_features)]
-        if self.is_first_call:
-            self.set_min_max_lists(features, total_features, feature_length)
-            self.is_first_call = False
-        for x in range(feature_length):
-            maximum = self.maximum_feature_list[x]
-            minimum = self.minimum_feature_list[x]
-            max_min_diff = maximum - minimum
-            for y in range(total_features):
-                normalized_features[y][x] = 0 if max_min_diff == 0 else (features[y][x] - minimum) / max_min_diff
-        return normalized_features
+        total_data = len(features)
+        total_features = len(features[0])
+        normalized_features = [[0] * total_features for _ in range(total_data)]
+        minimum_feature_list = [float("inf")] * total_features
+        maximum_feature_list = [float("-inf")] * total_features
 
-    def set_min_max_lists(self, features, total_features, feature_length):
-        for x in range(feature_length):
-            minimum = float("inf")
-            maximum = float("-inf")
-            for i in range(total_features):
-                feature_value = features[i][x]
-                maximum = feature_value if feature_value > maximum else maximum
-                minimum = feature_value if feature_value < minimum else minimum
-            self.maximum_feature_list.append(maximum)
-            self.minimum_feature_list.append(minimum)
+        for y in range(total_data):
+            for x in range(total_features):
+                val = features[y][x]
+                maximum_feature_list[x] = max(maximum_feature_list[x], val)
+                minimum_feature_list[x] = min(minimum_feature_list[x], val)
+
+        for y in range(total_data):
+            for x in range(total_features):
+                max_min_diff = maximum_feature_list[x] - minimum_feature_list[x]
+                normalized_features[y][x] = 0 if max_min_diff == 0 else ((features[y][x] - minimum_feature_list[x]) / max_min_diff)
+        return normalized_features
