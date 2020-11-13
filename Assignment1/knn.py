@@ -6,6 +6,9 @@ from collections import Counter
 ############################################################################
 
 class KNN:
+    features = None
+    labels = None
+
     def __init__(self, k, distance_function):
         """
         :param k: int
@@ -27,7 +30,8 @@ class KNN:
         :param features: List[List[float]]
         :param labels: List[int]
         """
-        raise NotImplementedError
+        self.features = list(features)
+        self.labels = list(labels)
 
     # TODO: find KNN of one point
     def get_k_neighbors(self, point):
@@ -38,9 +42,16 @@ class KNN:
         :param point: List[float]
         :return:  List[int]
         """
-        raise NotImplementedError
-		
-	# TODO: predict labels of a list of points
+        nearest_neighbours = []
+        for i in range(len(self.features)):
+            nearest_neighbours.append((self.labels[i], self.distance_function(point, self.features[i])))
+            nearest_neighbours.sort(key=lambda y: y[1])
+        k_nearest_neighbour_labels = []
+        for i in range(self.k):
+            k_nearest_neighbour_labels.append(nearest_neighbours[i][0])
+        return k_nearest_neighbour_labels
+
+    # TODO: predict labels of a list of points
     def predict(self, features):
         """
         This function takes 2D list of test data points, similar to those from train function. Here, you need to process
@@ -51,7 +62,12 @@ class KNN:
         :param features: List[List[float]]
         :return: List[int]
         """
-        raise NotImplementedError	
+        predicted_labels = []
+        for point in features:
+            k_nearest_labels = self.get_k_neighbors(point)
+            most_common, num_most_common = Counter(k_nearest_labels).most_common(1)[0]
+            predicted_labels.append(most_common)
+        return predicted_labels
 
 
 if __name__ == '__main__':
