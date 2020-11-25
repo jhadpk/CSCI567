@@ -30,14 +30,21 @@ class HMM:
         """
         S = len(self.pi)
         L = len(Osequence)
-        O = self.find_item(Osequence)
         alpha = np.zeros([S, L])
-        ######################################################
-        # TODO: compute and return the forward messages alpha
-        ######################################################
+        output = self.obs_dict[Osequence[0]]
+        for i in range(S):
+            alpha[i][0] = self.pi[i] * self.B[i][output]
+        for t in range(1, L):
+            xt = self.obs_dict[Osequence[t]]
+            for s in range(S):
+                sigma_a_alpha = 0
+                for s_dash in range(S):
+                    sigma_a_alpha = sigma_a_alpha + self.A[s_dash][s] * alpha[s_dash][t - 1]
+                alpha[s][t] = self.B[s][xt] * sigma_a_alpha
+        return alpha
 
 
-        
+
 
     def backward(self, Osequence):
         """
@@ -50,11 +57,18 @@ class HMM:
         """
         S = len(self.pi)
         L = len(Osequence)
-        O = self.find_item(Osequence)
         beta = np.zeros([S, L])
-        #######################################################
-        # TODO: compute and return the backward messages beta
-        #######################################################
+        T = L-1
+        for s in range(S):
+            beta[s][T] = 1
+        for tr in range(0, T):
+            t = T - 1 - tr
+            for s in range(S):
+                sigma_a_b_beta = 0
+                for s_dash in range(S):
+                    sigma_a_b_beta = sigma_a_b_beta + self.A[s][s_dash] * self.B[s_dash][self.obs_dict[Osequence[t + 1]]] * beta[s_dash][t + 1]
+                beta[s][t] = sigma_a_b_beta
+        return beta
 
 
     def sequence_prob(self, Osequence):
@@ -65,11 +79,12 @@ class HMM:
         Returns:
         - prob: A float number of P(X_{1:T}=x_{1:T})
         """
-        
-        #####################################################
-        # TODO: compute and return prob = P(X_{1:T}=x_{1:T})
-        #   using the forward/backward messages
-        #####################################################
+        T = len(Osequence) - 1
+        alpha = self.forward(Osequence)
+        prob = 0
+        for s in range(len(self.pi)):
+            prob += alpha[s][T]
+        return prob
 
 
     def posterior_prob(self, Osequence):
@@ -79,14 +94,23 @@ class HMM:
 
         Returns:
         - gamma: (num_state*L) A numpy array where gamma[i, t-1] = P(Z_t = s_i | X_{1:T}=x_{1:T})
-		           (note that this is gamma[i, t-1] instead of gamma[i, t])
+        (note that this is gamma[i, t-1] instead of gamma[i, t])
         """
-        ######################################################################
-        # TODO: compute and return gamma using the forward/backward messages
-        ######################################################################
+        beta = self.backward(Osequence)
+        alpha = self.forward(Osequence)
+        S = len(self.pi)
+        T = len(Osequence)
+        prob = np.zeros([S, T])
+        denominator = 0
+        for s in range(S):
+            denominator += alpha[s][T - 1]
+        for i in range(T):
+            for s in range(S):
+                numerator = alpha[s][i] * beta[s][i]
+                prob[s][i] = numerator / denominator
+        return prob
 
 
-    
     def likelihood_prob(self, Osequence):
         """
         Inputs:
@@ -96,12 +120,19 @@ class HMM:
         - prob: (num_state*num_state*(L-1)) A numpy array where prob[i, j, t-1] = 
                     P(Z_t = s_i, Z_{t+1} = s_j | X_{1:T}=x_{1:T})
         """
+        beta = self.backward(Osequence)
+        alpha = self.forward(Osequence)
         S = len(self.pi)
-        L = len(Osequence)
-        prob = np.zeros([S, S, L - 1])
-        #####################################################################
-        # TODO: compute and return prob using the forward/backward messages
-        #####################################################################
+        T = len(Osequence)
+        prob = np.zeros([S, S, T - 1])
+        denominator = 0
+        for s in range(S):
+            denominator += alpha[s][T - 1]
+        for i in range(T - 1):
+            for s in range(S):
+                for s_dash in range(S):
+                    prob[s, s_dash, i] = self.A[s, s_dash] * self.B[s_dash, self.obs_dict[Osequence[i + 1]]] * beta[s_dash, i + 1] * alpha[s, i] / denominator
+        return prob
 
 
     def viterbi(self, Osequence):
@@ -113,12 +144,40 @@ class HMM:
         - path: A List of the most likely hidden states (return actual states instead of their indices;
                     you might find the given function self.find_key useful)
         """
-        path = []
-        ################################################################################
-        # TODO: implement the Viterbi algorithm and return the most likely state path
-        ################################################################################
-        
-        return path
+        S = len(self.pi)
+        T = len(Osequence)
+        big_delta = np.zeros([S, T], dtype="int")
+        delta = np.zeros([S, T])
+        xt = self.obs_dict[Osequence[0]]
+        for s in range(S):
+            delta[s][0] = self.pi[s] * self.B[s][xt]
+
+        for t in range(1, T):
+            xt = self.obs_dict[Osequence[t]]
+            for s in range(S):
+                max_a_smalldelta = -1
+                argmax_a_smalldelta = -1
+                for s_dash in range(S):
+                    delta_temp = self.A[s_dash][s] * delta[s_dash][t - 1]
+                    if delta_temp > max_a_smalldelta:
+                        max_a_smalldelta = delta_temp
+                        argmax_a_smalldelta = s_dash
+                delta[s][t] = self.B[s][xt] * max_a_smalldelta
+                big_delta[s][t] = argmax_a_smalldelta
+        z_star = []
+        z = np.argmax(delta[:, T - 1])
+        z_star.append(z)
+        for t in range(T - 1, 0, -1):
+            z = big_delta[z][t]
+            z_star.append(z)
+        z_star = z_star[::-1]
+        state_sequence = [0] * len(z_star)
+
+        for state, observation in self.state_dict.items():
+            for i in range(len(z_star)):
+                if observation == z_star[i]:
+                    state_sequence[i] = state
+        return state_sequence
 
 
     #DO NOT MODIFY CODE BELOW
